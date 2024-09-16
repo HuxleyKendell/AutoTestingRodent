@@ -6,10 +6,10 @@
 */
 
 -- flyway:executeInTransaction=false
-DECLARE @BackupFilePath NVARCHAR(128) = N'${flyway:workingDirectory}\backups\AutoBackup_Customer.bak';
+DECLARE @BackupFilePath NVARCHAR(128) = N'${flyway:workingDirectory}\backups\AutoBackup_NewWorldDB.bak';
 DECLARE @DatabaseName NVARCHAR(128) = N'${flyway:database}';
-DECLARE @LogicalDataFileName NVARCHAR(128) = 'AdventureWorks2016_Data';
-DECLARE @LogicalLogFileName NVARCHAR(128) = 'AdventureWorks2016_Log';
+DECLARE @LogicalDataFileName NVARCHAR(128) = 'Eastwind_Dev';
+DECLARE @AdventureWorks2016_Log NVARCHAR(128) = 'Eastwind_Dev_log';
 
 -- Attempts to Auto Find the Paths to the logical files!
 DECLARE @mdfLocation NVARCHAR(256) = CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS NVARCHAR(200));  -- Get the default data file path
@@ -45,7 +45,7 @@ BEGIN TRY
     FROM DISK = ''' + @BackupFilePath + '''
     WITH REPLACE,
     MOVE ''' + @LogicalDataFileName + ''' TO ''' + @DataFilePath + ''',
-    MOVE ''' + @LogicalLogFileName + ''' TO ''' + @LogFilePath + ''';';
+    MOVE ''' + @AdventureWorks2016_Log + ''' TO ''' + @LogFilePath + ''';';
     EXEC sp_executesql @mySQL;
 
     -- Put the database back in multi_user mode
