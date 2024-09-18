@@ -1,13 +1,13 @@
-#SQLSERVER MODULE NEEDED
+# dbatools MODULE NEEDED
 
-if (!(Get-Module -ListAvailable -Name SqlServer)) {
-    Write-Host "SqlServer module not found. Installing module..."
+if (!(Get-Module -ListAvailable -Name dbatools)) {
+    Write-Host "dbatools module not found. Installing module..."
     
-    # Install the SqlServer module
-    Install-Module -Name SqlServer -Force -AllowClobber
-    Write-Host "SqlServer module installed successfully."
+    # Install the dbatools module
+    Install-Module -Name dbatools -Force -AllowClobber
+    Write-Host "dbatools module installed successfully."
 } else {
-    Write-Host "SqlServer module is already installed."
+    Write-Host "dbatools module is already installed."
 }
 
 
@@ -18,6 +18,37 @@ $backupDir = $projectDir + "\backups"
 $serverName = Read-Host "Enter the SQL Server name"
 $backupFileName = "AutoBackup_$sourceDB.bak"  # Backup file naming convention
 $backupPath = Join-Path $backupDir $backupFileName
+
+
+do {
+    $trustCert = Read-Host "Do we need to trust the Server Certificate [Y] or [N]?"
+    $trustCert = $trustCert.ToUpper()  # Convert the input to uppercase
+}
+until ($trustCert -eq 'Y' -or $trustCert -eq 'N')  # Proper comparison
+
+do {
+    $encryptConnection = Read-Host "Do we need to enycrpt the connection [Y] or [N]?"
+    $encryptConnection = $trustCert.ToUpper()  # Convert the input to uppercase
+}
+until ($trustCert -eq 'Y' -or $trustCert -eq 'N')  # Proper comparison
+
+#Block to generate connection string
+if ($trustCert -eq 'Y' -and $encryptConnection -eq 'Y')
+{ 
+$SqlConnection = Connect-DbaInstance -SqlInstance $serverName -TrustServerCertificate -EncryptConnection
+}
+if ($trustCert -eq 'Y' -and $encryptConnection -eq 'N')
+{ 
+$SqlConnection = Connect-DbaInstance -SqlInstance $serverName -TrustServerCertificate
+}
+if ($trustCert -eq 'N' -and $encryptConnection -eq 'Y')
+{ 
+$SqlConnection = Connect-DbaInstance -SqlInstance $serverName -EncryptConnection
+}
+if ($trustCert -eq 'N' -and $encryptConnection -eq 'N')
+{ 
+$SqlConnection = Connect-DbaInstance -SqlInstance $serverName -TrustServerCertificate -EncryptConnection
+}
 
 # Step 1: Run the first script to create the schema backup
 $sqlCreateBackup = @"
@@ -41,7 +72,7 @@ EXEC sp_executesql @Result; -- Execute the drop database command
 
 "@
 
-Invoke-Sqlcmd -Query $sqlCreateBackup -ServerInstance $serverName
+Invoke-DbaQuery -Query $sqlCreateBackup -SqlInstance $sqlConnection
 
 # Step 2: Find the logical file paths of the original database
 $sqlFindPaths = @"
@@ -63,7 +94,7 @@ WHERE type_desc = 'LOG';
 SELECT @LogicalDataFileName AS Column1, @LogicalLogFileName AS Column2;
 "@
 
-$paths = Invoke-Sqlcmd -Query $sqlFindPaths -ServerInstance $serverName
+$paths = Invoke-DbaQuery -Query $sqlFindPaths -SqlInstance $sqlConnection
 
 # Reference Column1 and Column2 for the file names
 $logicalDataFileName = $paths[0]
@@ -162,14 +193,10 @@ END
 "@
 
 
-Invoke-Sqlcmd -Query $sqlRestore -ServerInstance $serverName
+Invoke-DbaQuery -Query $sqlRestore -SqlInstance $sqlConnection
 
-Write-Host "Succesfully Restored: $logicalLogFileName"
+Write-Host "Succesfully Created AutoPilot Testing Databases from: $sourceDB"
 
-
-Invoke-Sqlcmd -Query $sqlRestore -ServerInstance $serverName
-
-Write-Host "Succesfully Restored: $logicalLogFileName"
 
 # Step 4: Update the B001__baseline.sql script with the correct logical data and log file paths
 Get-ChildItem -Filter B001* -Path $projectDir\migrations -Recurse | Move-Item -Destination $projectDir\scripts\temp\
